@@ -130,9 +130,9 @@ Examples: **Noisy Lucky Coins** should introduce noise to the circuit to alterna
 |---|---|
 | The Practice Yard | Use X to lower the first bridge, then stand beside either second-layer bridge and resolve its local winch: round lowers the detour, diamond lowers the shortcut. Both crossings are independently interactable before heading to Pauli. |
 | Tidemark Mill | At the entrance, choose the long route through the mill creatures or recombine the nearby sluice into yin to open a clear, narrow passage before the creature gauntlet. A tonic waits farther along the creature route; earn a Lucky Coin after clearing the room. |
-| Ember Kilns | At the entrance, resolve the split-flame circuit with P(π), then H. The kiln forges a Phase Lens weapon charge: the next strike deals one extra damage and consumes it. |
-| The Glaze Orchard | Two wisps and their resolve core wait at the entrance. Approach and resolve H, P(π), H to merge the pair into one and clear the shortcut; the creature route remains playable if the puzzle is skipped. |
-| The Gilt Conservatory | Two separate seals stand at the entrance. Approach and resolve each in turn (X for the first; P(π), then H for the second) to expose the Crowned Split Slime, then strike it and choose a keepsake. |
+| Ember Kilns | At the right end, resolve the split-flame circuit with P(π), then H. The kiln forges a Phase Lens weapon charge: the next strike deals one extra damage and consumes it. |
+| The Glaze Orchard | Two wisps and their resolve core wait at the right end. Approach and resolve H, P(π), H to merge the pair into one and clear the shortcut; the creature route remains playable if the puzzle is skipped. |
+| The Gilt Conservatory | Two separate seals stand at the right end. Approach and resolve each in turn (X for the first; P(π), then H for the second) to expose the Crowned Split Slime, then strike it and choose a keepsake. |
 
 Between the yard and Tidemark Mill, a walkable meadow leads to the cave entrance. Mossy threshold stones, ruined arches and lava vents give the dungeons their terrain. Three smaller monsters patrol each dungeon on tactical turns. Cyan and pink light distinguish quantum channels.
 

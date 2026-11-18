@@ -48,7 +48,7 @@ func walk_to(destination: Vector2i) -> void:
 			break
 		for direction: Vector2i in [Vector2i.RIGHT,Vector2i.UP,Vector2i.DOWN,Vector2i.LEFT]:
 			var neighbor := cell+direction
-			if game.board.walkable(neighbor) and not parent.has(neighbor) and neighbor!=game.guard_cell and (game.shield==0 or neighbor!=game.board.exit_cell):
+			if game.board.walkable(neighbor) and not parent.has(neighbor) and neighbor!=game.guard_cell and (neighbor!=game.board.exit_cell or destination==game.board.exit_cell):
 				parent[neighbor] = cell
 				frontier.append(neighbor)
 	var cursor := destination
@@ -148,28 +148,29 @@ func run() -> void:
 	check(game.board.walkable(game.board.FAR_SPANS[0]) and game.board.walkable(game.board.FAR_SPANS[1]),"The detour and shortcut open independently at their own winches")
 	for stage in range(5):
 		check(game.stage==stage,"Room order")
+		if stage!=0:
+			check(game.board.roamers.size()==3,"Dungeon has three additional roaming monsters")
 		if stage==1:
 			check(game.buttons.has("fight_route") and game.buttons.has("plan"),"Mill offers a fight route and a visible sluice resolve choice")
 		match stage:
 			1: solve(["H"])
 			2:
-				walk_to(game.board.RESOLVE_CELL)
+				walk_to(game.board.resolve_cell(game.stage))
 				solve(["P","H"])
 				check(game.lens_ready,"Correct kiln resolution awards the Phase Lens charge")
 			3:
 				check(game.board.wisps.size()==2 and not game.board.wisps_merged,"Orchard starts with two separate wisps")
-				walk_to(game.board.RESOLVE_CELL)
+				walk_to(game.board.resolve_cell(game.stage))
 				solve(["H","P","H"])
 				check(game.board.wisps_merged,"Correct orchard resolution merges the wisps")
 			4:
-				check(game.board.seal_nodes.size()==2,"Both conservatory seals are built at the room entrance")
+				check(game.board.seal_nodes.size()==2,"Both conservatory seals are built at the right end")
 				walk_to(game.board.SEAL_CELLS[0])
 				solve(["X"])
 				walk_to(game.board.SEAL_CELLS[1])
 				solve(["P","H"])
 		check(game.phase==("Observe" if stage==0 else "Navigate"),"Yard stays in Observe; dungeon route opens in Navigate")
 		if stage!=0:
-			check(game.board.roamers.size()==3,"Dungeon has three additional roaming monsters")
 			check(game.board.walkable(game.board.SHORTCUTS[stage]),"Measurement clears the dungeon passage")
 		command("pause")
 		command("resume")
@@ -228,8 +229,8 @@ func run() -> void:
 	check(game.phase=="Achieve" and not game.buttons.has("explore"),"The detour reaches Pauli without a post-rescue prompt")
 	game.stage = 4
 	game.build_stage()
-	game.health = 1
 	walk_to(game.board.SEAL_CELLS[0])
+	game.health = 1
 	solve([])
 	check(game.phase=="Lost","Defeat condition")
 	print("World smoke test: %d failures" % failures)

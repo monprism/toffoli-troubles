@@ -390,6 +390,57 @@ func yard_hint(reg: RuneRegister) -> String:
 			return "Apply P(π). The diamond amplitude changes sign; both odds stay at 50%."
 	return "Undo the last rune to return to the previous arrangement."
 
+func dungeon_hint(reg: RuneRegister) -> String:
+	if program.size()>=8:
+		return "The rune tray is full. Undo the last rune."
+	if stage==1:
+		if is_equal_approx(reg.yin.length_squared(),1.0):
+			return "Measure now. H has gathered both mill currents into round |0⟩."
+		if program.is_empty():
+			return "The sluice is already split into even paths. Apply H, then measure."
+		if program.back()=="H":
+			return "H has recombined the currents into round |0⟩. Measure now."
+		return "Apply H to recombine the split flow into round |0⟩."
+	if stage==2:
+		if is_equal_approx(reg.yang.length_squared(),1.0):
+			return "Measure now. P(π), then H forges the diamond flame."
+		if program.is_empty():
+			return "The kiln flame is split. Apply P(π), then H."
+		if program.back().begins_with("P"):
+			return "The diamond amplitude has changed sign. Apply H to expose its odds."
+		if program.back()=="H" and is_equal_approx(absf(reg.yin.angle_to(reg.yang)),PI):
+			return "H has forged the flame into diamond |1⟩. Measure now."
+		return "Apply P(π), then H."
+	if stage==3:
+		if is_equal_approx(reg.yang.length_squared(),1.0):
+			return "Measure now. H, P(π), H has merged the wisps into diamond |1⟩."
+		if program.is_empty():
+			return "The two wisps are separate. Apply H, then P(π), then H."
+		if program.back()=="H" and is_equal_approx(absf(reg.yin.angle_to(reg.yang)),PI):
+			return "H has merged the pair into diamond |1⟩. Measure now."
+		if program.back().begins_with("P"):
+			return "The diamond amplitude has changed sign. Apply H to expose its odds."
+		if program.back()=="H":
+			return "H made even paths. Set the angle to 180°, then apply P, then H."
+		return "Apply H, then P(π), then H."
+	if seal==0:
+		if is_equal_approx(reg.yang.length_squared(),1.0):
+			return "Measure now. Invert has flipped the first seal to diamond |1⟩."
+		if program.is_empty():
+			return "The first seal reads yin. Invert (X), then measure."
+		if program.back()=="X":
+			return "X has flipped the seal to |1⟩. Measure now."
+		return "Invert (X) flips |0⟩ to |1⟩. Apply X, then measure."
+	if is_equal_approx(reg.yang.length_squared(),1.0):
+		return "Measure now. P(π), then H turns the split seal to diamond |1⟩."
+	if program.is_empty():
+		return "The second seal is split. Apply P(π), then H."
+	if program.back().begins_with("P"):
+		return "The diamond amplitude has changed sign. Apply H to expose its odds."
+	if program.back()=="H" and is_equal_approx(absf(reg.yin.angle_to(reg.yang)),PI):
+		return "H has turned the split seal to diamond |1⟩. Measure now."
+	return "Apply P(π), then H."
+
 func square_name(cell: Vector2i) -> String:
 	return String.chr(65+cell.x)+str(Board.BOARD_SIZE.y-cell.y)
 
@@ -409,7 +460,7 @@ func adjacent_bridge_index() -> int:
 func at_current_resolve_object() -> bool:
 	if stage==4:
 		return seal<Board.SEAL_CELLS.size() and hero_cell==Board.SEAL_CELLS[seal]
-	return stage in [2,3] and hero_cell==Board.RESOLVE_CELL
+	return stage in [2,3] and hero_cell==Board.resolve_cell(stage)
 
 func mark_moves() -> void:
 	for direction: Vector2i in [Vector2i.UP,Vector2i.DOWN,Vector2i.LEFT,Vector2i.RIGHT]:
@@ -437,6 +488,13 @@ func mark_moves() -> void:
 				for bridge_index in Board.FAR_WINCHES.size():
 					if cell==Board.FAR_WINCHES[bridge_index] and board.blocked.has(Board.FAR_SPANS[bridge_index]):
 						marker = "Detour winch" if bridge_index==0 else "Shortcut winch"
+		elif phase=="Observe":
+			if stage==2 and cell==Board.resolve_cell(stage):
+				marker = "Kiln core"
+			elif stage==3 and cell==Board.resolve_cell(stage):
+				marker = "Wisp pair"
+			elif stage==4 and seal<Board.SEAL_CELLS.size() and cell==Board.SEAL_CELLS[seal]:
+				marker = "First seal" if seal==0 else "Second seal"
 		var text := label(inlay,marker,Vector3.UP*0.045,36,Board.CREAM)
 		text.rotation.x = -PI/2
 		text.set_meta("ink",Board.CREAM)
@@ -580,9 +638,19 @@ func refresh() -> void:
 					if at_current_resolve_object():
 						var action_name := "Resolve kiln phase" if stage==2 else ("Resolve wisp pair" if stage==3 else ("Resolve first seal" if seal==0 else "Resolve second seal"))
 						row(["plan","hint"],[action_name,"Hint"])
-						line = "Resolve the kiln phase to forge the Phase Lens." if stage==2 else ("Resolve the paired wisps into one." if stage==3 else "The two conservatory seals are here at the entrance.")
+						line = "Resolve the kiln phase to forge the Phase Lens." if stage==2 else ("Resolve the paired wisps into one." if stage==3 else ("Resolve the first seal." if seal==0 else "Resolve the second seal."))
 					else:
-						line = "Approach the kiln phase core." if stage==2 else ("Approach the paired wisps at the entry." if stage==3 else ("Approach the first seal." if seal==0 else "Approach the second seal."))
+						line = "Approach the kiln phase core on the right." if stage==2 else ("Approach the paired wisps on the right." if stage==3 else ("Approach the first seal on the right." if seal==0 else "Approach the second seal on the right."))
+						if stage==2:
+							label(ui,"Kiln core"+(" (%s)" % square_name(Board.resolve_cell(stage)) if show_coordinates else ""),Board.square(Board.resolve_cell(stage))+Vector3.UP*1.18,28,Board.BRASS)
+						elif stage==3:
+							label(ui,"Wisp pair"+(" (%s)" % square_name(Board.resolve_cell(stage)) if show_coordinates else ""),Board.square(Board.resolve_cell(stage))+Vector3.UP*1.18,28,Board.BRASS)
+						elif stage==4:
+							label(ui,("First seal" if seal==0 else "Second seal")+(" (%s)" % square_name(Board.SEAL_CELLS[seal]) if show_coordinates else ""),Board.square(Board.SEAL_CELLS[seal])+Vector3.UP*1.18,28,Board.BRASS)
+					var attacker := board.adjacent_monster(hero_cell)
+					if attacker and not at_current_resolve_object():
+						line = "%s nearby. Strike, block or move." % attacker.NAMES[attacker.kind]
+						row(["attack","block"],["Strike","Block"])
 					field_notes()
 			"Resolve":
 				if not selected:
@@ -595,7 +663,7 @@ func refresh() -> void:
 						action("coin_read","Lucky coin",Vector3(-3.85,1.82,0.1),2.1,Board.INK)
 					circuit_strip(preview)
 					var odds := roundi(preview.yang.length_squared()*100)
-					line = "Aim for the round exit, then measure." if stage==1 else "Aim for the diamond outcome, then measure."
+					line = "Goal: Round |0⟩ = 100%. Aim for the round exit, then measure." if stage==1 else "Goal: Diamond |1⟩ = 100%. Aim for the diamond outcome, then measure."
 					var ids := ["X"] if stage in [0,4] and seal==0 else ["H"]
 					var names := ["Invert"] if ids[0]=="X" else ["Hadamard"]
 					if (stage >= 2 or stage == 0) and ids[0]=="H":
@@ -604,8 +672,8 @@ func refresh() -> void:
 					ids.append_array(["undo","read"])
 					names.append_array(["Undo","Measure"])
 					row(ids,names)
+					field_notes()
 					if stage==0:
-						field_notes()
 						var cue := "Winch: 0 holds the bridge up. 1 lowers it. Try X." if seal==0 else "Round lowers the upstream detour. Diamond lowers the bridge to Pauli."
 						if seal==1 and target_bridge>=0:
 							cue = "This detour winch opens on round. Measure 0." if target_bridge==0 else "This shortcut winch opens on diamond. Prepare |1⟩, then measure."
@@ -623,6 +691,8 @@ func refresh() -> void:
 						if hint:
 							cue = yard_hint(preview)
 						line = cue
+					elif hint:
+						line = dungeon_hint(preview)
 					if message!="":
 						line = message
 			"Navigate":
@@ -741,15 +811,28 @@ func refresh_story() -> void:
 		line_one = "The Crowned Slime has fallen. Light is returning to the mill."
 		line_two = "Hadamard entrusts you with %s." % RELICS[relic]
 		row(["restart","quit"],["Play again","Quit"],4.25)
-	wizard.visible = story_phase!="Title"
-	title_runes.update_state(story_phase=="Title",Vector3(0,2.0,-4.9),Vector2.RIGHT*0.707,Vector2.UP*0.707)
-	var tablet := board.box(ui,Vector3(0.0 if story_phase=="Title" else 1.8,2.24,0.4),Vector3(16.6,3.8,0.22),Board.INK)
+	var is_title := story_phase=="Title"
+	wizard.visible = not is_title
+	title_runes.update_state(is_title,Vector3(0,1.9,-4.7),Vector2.RIGHT*0.707,Vector2.UP*0.707)
+	title_runes.scale = Vector3.ONE*(1.7 if is_title else 1.35)
+	if is_title:
+		var backdrop := board.box(ui,Vector3(0,1.9,-5.3),Vector3(44.0,29.0,0.24),Color("#10161a"))
+		backdrop.rotation.x = -0.54
+		backdrop.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		var glow := board.aura(ui,Vector3(0,1.5,-1.3),16.0,Board.CYAN)
+		glow.rotation.x = -0.54
+		var violet_glow := board.aura(ui,Vector3(0,3.1,-1.35),12.5,Board.VIOLET)
+		violet_glow.rotation.x = -0.54
+	var tablet_pos := Vector3(0.0 if is_title else 1.8,2.24,0.4)
+	var tablet_size := Vector3(20.6,5.4,0.22) if is_title else Vector3(16.6,3.8,0.22)
+	var tablet := board.box(ui,tablet_pos,tablet_size,Board.INK)
 	tablet.rotation.x = -0.54
-	board.box(tablet,Vector3(0,1.70,0.13),Vector3(16.1,0.027,0.027),Board.BRASS)
-	board.box(tablet,Vector3(0,-1.70,0.13),Vector3(16.1,0.027,0.027),Board.BRASS)
-	label(tablet,speaker,Vector3(0,0.76,0.14),56 if story_phase=="Title" else 41,Board.BRASS)
-	label(tablet,line_one,Vector3(0,-0.19,0.14),25,Board.CREAM)
-	label(tablet,line_two,Vector3(0,-0.73,0.14),25,Board.CREAM)
+	var strip := tablet_size.y*0.5-0.20
+	board.box(tablet,Vector3(0,strip,0.13),Vector3(tablet_size.x-0.5,0.027,0.027),Board.BRASS)
+	board.box(tablet,Vector3(0,-strip,0.13),Vector3(tablet_size.x-0.5,0.027,0.027),Board.BRASS)
+	label(tablet,speaker,Vector3(0,0.9 if is_title else 0.76,0.14),72 if is_title else 41,Board.BRASS)
+	label(tablet,line_one,Vector3(0,-0.45 if is_title else -0.19,0.14),30 if is_title else 25,Board.CREAM)
+	label(tablet,line_two,Vector3(0,-1.05 if is_title else -0.73,0.14),30 if is_title else 25,Board.CREAM)
 
 func refresh_field() -> void:
 	board.process_mode = Node.PROCESS_MODE_DISABLED if paused else Node.PROCESS_MODE_INHERIT
@@ -1003,7 +1086,7 @@ func _unhandled_input(event: InputEvent) -> void:
 		refresh()
 
 func _process(delta: float) -> void:
-	if story=="" and (phase=="Observe" or (stage==0 and phase=="Resolve")) and not paused and not hint:
+	if story=="" and phase in ["Observe","Resolve"] and not paused and not hint:
 		idle_time += delta
 		if idle_time>(6.0 if stage==0 else 12.0):
 			hint = true

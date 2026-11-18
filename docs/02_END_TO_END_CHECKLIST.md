@@ -92,9 +92,9 @@
 - [ ] Verify the mill tonic is placed after the creature route and can be collected after that turn's damage when below 5 HP.
 - [ ] On entering Navigate, sample any pending readout once. Keep the resulting environment fixed during single-step movement, attacks, blocks and combat item use.
 - [x] Verify that standing next to either second-layer bridge exposes its local winch and the matching measurement opens only that crossing; the full-route smoke test also lowers both independently.
-- [ ] Verify Ember Kilns can be resolved from its entrance and grants a Phase Lens charge; the next lens strike deals 2 damage and consumes the charge.
-- [ ] Verify the Glaze Orchard begins with two wisps and a nearby resolve core; correct H–P(π)–H resolution visibly merges them and opens the shortcut.
-- [ ] Verify both Gilt Conservatory seals are visible at the entrance and must be resolved one at a time before the boss is exposed.
+- [ ] Verify Ember Kilns can be resolved from its right-end core and grants a Phase Lens charge; the next lens strike deals 2 damage and consumes the charge.
+- [ ] Verify the Glaze Orchard begins with two wisps and a resolve core at the right end; correct H–P(π)–H resolution visibly merges them and opens the shortcut.
+- [ ] Verify both Gilt Conservatory seals are visible at the right end and must be resolved one at a time before the boss is exposed.
 - [ ] Verify that dungeon exits remain reachable with each shortcut sealed and the navigation message explains the open route.
 - [ ] Animate coherent path splitting, phase adjustment and recombination, with outcomes tied to simulation.
 - [ ] Add invalid-action explanations and Undo-before-resolve where sensible.

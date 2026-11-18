@@ -10,7 +10,8 @@ const FIRST_SPAN := Vector2i(3,9)
 const FAR_SPANS := [Vector2i(7,2),Vector2i(7,6)]
 const PAULI := Vector2i(10,6)
 const RESOLVE_CELL := Vector2i(2,9)
-const SEAL_CELLS := [Vector2i(2,9),Vector2i(2,8)]
+const RESOLVE_CELLS := {2: Vector2i(11,3), 3: Vector2i(11,7)}
+const SEAL_CELLS := [Vector2i(11,3),Vector2i(10,3)]
 const GRID_WIDTH := BOARD_SIZE.x*CELL
 const GRID_DEPTH := BOARD_SIZE.y*CELL
 const REAR := -GRID_DEPTH*0.5
@@ -31,6 +32,9 @@ var room_stage := 0
 
 static func square(cell: Vector2i) -> Vector3:
 	return Vector3((cell.x+0.5)*CELL-GRID_WIDTH/2,0,(cell.y+0.5)*CELL-GRID_DEPTH/2)
+
+static func resolve_cell(stage: int) -> Vector2i:
+	return RESOLVE_CELLS.get(stage, RESOLVE_CELL)
 
 func walkable(cell: Vector2i) -> bool:
 	return Rect2i(Vector2i.ZERO,BOARD_SIZE).has_point(cell) and not blocked.has(cell)
@@ -183,7 +187,7 @@ func build(stage: int) -> void:
 				var t := i*PI/6
 				box(self,Vector3(-1+2.3*cos(t),0.32+2.3*sin(t),REAR-0.925),Vector3(1.12,0.54,0.8),[BRASS,CREAM][i%2]).rotation.z=t+PI/2
 	if stage!=0:
-		rune_station = square(RESOLVE_CELL)
+		rune_station = square(resolve_cell(stage))
 	if stage in [1,2,3]:
 		var socket := group(rune_station)
 		drum(socket,Vector3.UP*0.15,0.46,0.39,0.30,INK,8)
