@@ -16,6 +16,7 @@ var in_field := false
 var story := "Title"
 var briefing_page := 0
 var can_continue := false
+var prefer_gestures := false
 var wizard: Node3D
 var story_set: Node3D
 var title_runes: Board.QuantumFork
@@ -39,7 +40,7 @@ var first_tracking := true
 var seal := 0
 const MAX_HEALTH := 5
 const TONIC_HEAL := 2
-const TONIC_CELLS := {1: Vector2i(3,8),3: Vector2i(5,7)}
+const TONIC_CELLS := {1: Vector2i(10,3),3: Vector2i(5,7)}
 var health := MAX_HEALTH
 var guard_defeated := false
 var tonic: Node3D
@@ -66,6 +67,7 @@ var tracked := false
 var hand_beams: Array[MeshInstance3D] = []
 var focus := ""
 var buttons := {}
+var button_areas := {}
 
 func _ready() -> void:
 	add_child(table)
@@ -140,6 +142,7 @@ func _ready() -> void:
 	can_continue = checkpoint.load(SAVE)==OK
 	if can_continue:
 		show_coordinates = bool(checkpoint.get_value("settings","coordinates",false))
+		prefer_gestures = bool(checkpoint.get_value("settings","gestures",false))
 		coins = clampi(int(checkpoint.get_value("run","coins",0)),0,1)
 		lens_ready = bool(checkpoint.get_value("run","lens",false))
 		stage = clampi(int(checkpoint.get_value("run","stage",0)),0,4)
@@ -181,6 +184,7 @@ func save_boundary(resume_crossing := false) -> void:
 	var file := ConfigFile.new()
 	can_continue = true
 	file.set_value("settings","coordinates",show_coordinates)
+	file.set_value("settings","gestures",prefer_gestures)
 	file.set_value("run","coins",coins)
 	file.set_value("run","lens",lens_ready)
 	file.set_value("run","stage",stage)
@@ -254,7 +258,9 @@ func label(parent: Node3D, caption: String, at: Vector3, font_size: int, tint: C
 	node.font_size = font_size
 	node.pixel_size = 0.012
 	node.modulate = tint
-	node.outline_size = 0
+	# A strong dark edge keeps pale lettering legible against the miniature and room.
+	node.outline_size = 7
+	node.outline_modulate = Color("#241e19")
 	node.double_sided = false
 	parent.add_child(node)
 	node.position = at
@@ -300,9 +306,11 @@ func action(id: String, caption: String, at: Vector3, width: float, finish: Colo
 			for side in [-1,1]:
 				board.orb(area,Vector3(side*(width/2-0.11),0,0.123),Vector3.ONE*0.067,Board.BRASS)
 	var title := label(area,caption,Vector3(0,-0.13 if glyph!="" else 0.0,0.18),22,ink)
+	title.font_size = 28
 	title.set_meta("ink",ink)
 	area.set_meta("command",id)
 	buttons[id] = title
+	button_areas[id] = area
 
 func station_sign(id: String, caption: String, at: Vector3) -> void:
 	board.box(ui,Vector3(at.x,at.y*0.5,at.z-0.1),Vector3(0.12,at.y,0.14),Board.WOOD)
@@ -310,12 +318,16 @@ func station_sign(id: String, caption: String, at: Vector3) -> void:
 
 func row(ids: Array, captions: Array, base_z: float = Board.FRONT) -> void:
 	var width := minf(2.55,10.3/ids.size())
+	var spaced_choices := ids.has("coords_off") or ids.has("coords_on") or ids.has("gestures_yes") or ids.has("gestures_no")
+	var spacing := width*1.65 if spaced_choices else width
+	# Put the tray in front of the low mesa wall so it cannot hide pause or resolve actions.
 	var offset := 2.24 if (phase=="Resolve" and selected and not paused) or (phase=="Navigate" and not paused) else 0.0
-	var tray_width := width*ids.size()+0.21
-	board.box(ui,Vector3(0,-0.32,base_z+0.69+offset),Vector3(tray_width,0.30,1.04),Board.WOOD)
-	board.box(ui,Vector3(0,-0.19,base_z+1.15+offset),Vector3(tray_width,0.10,0.085),Board.BRASS)
+	var front_clearance := 2.10 if paused or (phase=="Observe" and stage>0) else 0.0
+	var tray_width := width+spacing*(ids.size()-1)+0.21
+	board.box(ui,Vector3(0,-0.32,base_z+0.69+offset+front_clearance),Vector3(tray_width,0.30,1.04),Board.WOOD)
+	board.box(ui,Vector3(0,-0.19,base_z+1.15+offset+front_clearance),Vector3(tray_width,0.10,0.085),Board.BRASS)
 	for i in ids.size():
-		action(ids[i],captions[i],Vector3((i-(ids.size()-1)*0.5)*width,0.04,base_z+0.65+offset),width-0.12,Board.INK)
+		action(ids[i],captions[i],Vector3((i-(ids.size()-1)*0.5)*spacing,0.04,base_z+0.65+offset+front_clearance),width-0.12,Board.INK)
 
 func circuit_strip(reg: RuneRegister) -> void:
 	var gates := PackedStringArray(["|+⟩" if starts_split() else "|0⟩"])
@@ -378,6 +390,14 @@ func near_guard(cell: Vector2i) -> bool:
 func mark_moves() -> void:
 	for direction: Vector2i in [Vector2i.UP,Vector2i.DOWN,Vector2i.LEFT,Vector2i.RIGHT]:
 		var cell := hero_cell+direction
+		var closed_bridge := stage==0 and not in_field and cell in [Board.FIRST_SPAN,Board.FAR_SPANS[0],Board.FAR_SPANS[1]] and board.blocked.has(cell)
+		if closed_bridge:
+			# Show the intended crossing even while its raised deck is still impassable.
+			var bridge_center := Board.square(cell)
+			var halo := board.aura(ui,bridge_center+Vector3.UP*2.15,Board.CELL*1.25,Color("#35f3ef"))
+			halo.rotation.x = -PI/2
+			var bridge_text := label(ui,"BRIDGE",bridge_center+Vector3.UP*2.42,32,Board.CREAM)
+			bridge_text.outline_size = 10
 		if not board.walkable(cell) or board.monster_at(cell) or (shield>0 and (cell==guard_cell or (stage==4 and cell==board.exit_cell))):
 			continue
 		var id := square_name(cell)
@@ -398,12 +418,6 @@ func take_beat(id: String) -> void:
 	if moves.has(id):
 		hero_cell = moves[id]
 		board.move_hero(hero_cell)
-		if tonic and tonic.visible and health<MAX_HEALTH and hero_cell==TONIC_CELLS[stage]:
-			var recovered := mini(TONIC_HEAL,MAX_HEALTH-health)
-			health += recovered
-			tonic.hide()
-			message = "Tonic restored %d HP." % recovered
-			checkpoint_needed = true
 	elif id=="attack" and shield>0 and near_guard(hero_cell):
 		shield -= 1
 		if shield==0:
@@ -426,6 +440,12 @@ func take_beat(id: String) -> void:
 				voices.play()
 	if shield>0 and near_guard(hero_cell) and beat%2==0 and id!="block":
 		health -= 1
+	if tonic and tonic.visible and health<MAX_HEALTH and hero_cell==TONIC_CELLS[stage]:
+		var recovered := mini(TONIC_HEAL,MAX_HEALTH-health)
+		health += recovered
+		tonic.hide()
+		message = "Tonic restored %d HP." % recovered
+		checkpoint_needed = true
 	beat += 1
 	if hero_cell==board.exit_cell:
 		phase = "Achieve"
@@ -438,6 +458,7 @@ func refresh() -> void:
 		ui.remove_child(child)
 		child.queue_free()
 	buttons.clear()
+	button_areas.clear()
 	moves.clear()
 	if story!="":
 		refresh_story()
@@ -480,7 +501,7 @@ func refresh() -> void:
 		board.puppy_calm = phase=="Achieve"
 		board.collar_tags[0].visible = true
 		board.collar_tags[1].visible = false
-		label(ui,"Pauli",Board.square(Board.PAULI)+Vector3.UP*1.7,28,Board.CREAM)
+		label(ui,"Pauli",Board.square(Board.PAULI)+Vector3.UP*4.1,36,Board.CREAM)
 	if stage!=0 and phase=="Navigate":
 		board.creature.position = Board.square(guard_cell)
 	board.landing.visible = stage==0 or phase in ["Navigate","Achieve"]
@@ -508,6 +529,11 @@ func refresh() -> void:
 						if hint:
 							line = "Select the green squares to reach the glowing mechanism."
 					field_notes()
+				elif stage==1:
+					line = "Choose: solve the sluice for a shorter route, or fight and evade the creatures."
+					if hint:
+						line = HINTS[stage]
+					row(["fight_route","plan","hint"],["Fight through","Resolve sluice","Hint"])
 				else:
 					station_sign("plan","Resolve",Vector3(3.35,1.10,-0.36))
 					field_notes()
@@ -551,10 +577,17 @@ func refresh() -> void:
 			"Navigate":
 				mark_moves()
 				line = "The passage is clear. Reach the brass-framed exit."
+				if stage in [1,2,3] and board.blocked.has(Board.SHORTCUTS[stage]):
+					line = "The shortcut is optional. Follow the open stones around it to reach the exit."
+				if stage==1 and message!="":
+					line = message
 				if message.begins_with("Tonic") or guard_defeated:
 					line = "%s Reach the brass-framed exit." % (message if message!="" else "Guardian defeated.")
 				if stage==0:
 					line = "%s Walk across to Pauli." % message
+					if seal==1 and hero_cell==Board.WINCHES[1] and (board.blocked.has(Board.FAR_SPANS[0]) or board.blocked.has(Board.FAR_SPANS[1])):
+						station_sign("plan","Use fork relay",Board.square(Board.WINCHES[1])+Vector3(-0.55,1.1,-0.77))
+						line = "Optional crossing: select the relay to lower the other bridge."
 				if shield>0:
 					line = "The guardian is active. Approach to strike."
 					if near_guard(hero_cell):
@@ -568,12 +601,15 @@ func refresh() -> void:
 			"Achieve":
 				line = "The vault seals are open." if stage==4 else "Room cleared. The next trail marker is lit."
 				if stage==0:
-					line = "Pauli is safe. The meadow trail leads to the dungeon."
+					line = "Pauli is safe. The other crossing is optional; return to the relay to lower it before leaving."
 				elif stage==1:
 					line = "Mill treasure: a Lucky Coin. Spend it for a noisy read."
 				elif stage==2:
 					line = "Kiln treasure: a Phase Lens. Add one half-turn to a core."
-				row(["next"],["Open treasury" if stage==4 else ("To the meadow" if stage==0 else "Next room")])
+				if stage==0 and (board.blocked.has(Board.FAR_SPANS[0]) or board.blocked.has(Board.FAR_SPANS[1])):
+					row(["explore","next"],["Try other bridge","To the meadow"])
+				else:
+					row(["next"],["Open treasury" if stage==4 else ("To the meadow" if stage==0 else "Next room")])
 			"Treasure":
 				line = "Choose a keepsake from the vault."
 				row(["coin","lens","dice"],RELICS)
@@ -583,10 +619,14 @@ func refresh() -> void:
 			"Lost":
 				line = "The trail has claimed your last heart."
 				row(["restart","quit"],["Try again","Quit"])
-		action("pause","Pause",Vector3(7.35,0.82,Board.FRONT+0.32),1.22,Board.BRASS)
-	var plaque := board.box(ui,Vector3(0,1.23,Board.FRONT+0.28),Vector3(10.35,0.63,0.1),Board.CREAM)
+		action("pause","Pause",Vector3(7.35,0.82,Board.FRONT+2.35),1.22,Board.BRASS)
+	var plaque_z := Board.FRONT+2.10 if paused else Board.FRONT+0.28
+	var plaque := board.box(ui,Vector3(0,1.23,plaque_z),Vector3(10.35,0.63,0.1),Board.CREAM)
 	plaque.rotation.x = -0.38
-	label(plaque,line,Vector3(0,0,0.062),mini(20, int(1480.0/maxi(1,line.length()))),Board.INK)
+	var plaque_text := label(plaque,plaque_copy(line),Vector3(0,0,0.062),mini(28, int(1850.0/maxi(1,line.length()))),Board.INK)
+	if plaque_text.text.contains("\n"):
+		(plaque.mesh as BoxMesh).size.y = 0.9
+		plaque_text.font_size = 26
 
 func build_story_set() -> void:
 	story_set = Node3D.new()
@@ -609,7 +649,7 @@ func refresh_story() -> void:
 	if not story_set:
 		build_story_set()
 	story_set.show()
-	var speaker := "Hadamard the Great"
+	var speaker := "Hadamard the Archemage"
 	var line_one := ""
 	var line_two := ""
 	var story_phase := story
@@ -627,13 +667,23 @@ func refresh_story() -> void:
 		elif briefing_page==1:
 			line_one = "Start in the Practice Yard. Pauli is stranded across the channels."
 			line_two = "Learn to lower the bridges there. The dungeon gates answer to the same runes."
-		else:
+		elif briefing_page==2:
 			line_one = "Would you like letters and numbers around the board?"
 			line_two = "The board starts with coordinates hidden. You can change this in Pause."
+		elif briefing_page==3:
+			line_one = "Would you use hand gestures if they were available?"
+			line_two = "Choose your preference. Gestures are not ready to test yet."
+		else:
+			line_one = "Planned: point ahead/right/back/left to move; pinch to select."
+			line_two = "Thumbs-up advances; open palm blocks; flick strikes. Not testable yet."
 		if briefing_page<2:
 			row(["story_next"],["Continue"],4.25)
-		else:
+		elif briefing_page==2:
 			row(["coords_off","coords_on"],["Hide coordinates","Show coordinates"],4.25)
+		elif briefing_page==3:
+			row(["gestures_yes","gestures_no"],["Yes, gestures","Buttons for now"],4.25)
+		else:
+			row(["gesture_done"],["Enter Practice Yard"],4.25)
 	else:
 		speaker = "The vault is open"
 		line_one = "The Crowned Slime has fallen. Light is returning to the mill."
@@ -661,15 +711,29 @@ func refresh_field() -> void:
 		line="Trail paused"
 		row(["resume","center","scale","tilt","coords_toggle","sound","quit"],["Resume","Recenter","Scale","Tilt","Labels off" if show_coordinates else "Labels on","Mute" if ambience.playing else "Unmute","Quit"])
 	else:
-		action("pause","Pause",Vector3(7.35,0.82,Board.FRONT+0.32),1.22,Board.BRASS)
+		action("pause","Pause",Vector3(7.35,0.82,Board.FRONT+2.35),1.22,Board.BRASS)
 		if phase=="Achieve":
 			line="Cold air rises from Tidemark Mill."
 			row(["next"],["Enter cave"])
 		else:
 			mark_moves()
-	var plaque := board.box(ui,Vector3(0,1.23,Board.FRONT+0.28),Vector3(10.35,0.63,0.1),Board.CREAM)
+	var plaque_z := Board.FRONT+2.10 if paused else Board.FRONT+0.28
+	var plaque := board.box(ui,Vector3(0,1.23,plaque_z),Vector3(10.35,0.63,0.1),Board.CREAM)
 	plaque.rotation.x=-0.38
-	label(plaque,line,Vector3(0,0,0.065),20,Board.INK)
+	var plaque_text := label(plaque,plaque_copy(line),Vector3(0,0,0.065),mini(28, int(1850.0/maxi(1,line.length()))),Board.INK)
+	if plaque_text.text.contains("\n"):
+		(plaque.mesh as BoxMesh).size.y = 0.9
+		plaque_text.font_size = 26
+
+func plaque_copy(line: String) -> String:
+	if line.length()<=54:
+		return line
+	var split_at := 54
+	while split_at>30 and line[split_at] != " ":
+		split_at -= 1
+	if split_at<=30:
+		return line
+	return line.substr(0,split_at)+"\n"+line.substr(split_at+1)
 
 func activate(id: String) -> void:
 	if not buttons.has(id):
@@ -698,6 +762,13 @@ func activate(id: String) -> void:
 			briefing_page += 1
 		"coords_off","coords_on":
 			show_coordinates = id=="coords_on"
+			briefing_page = 3
+			save_boundary()
+		"gestures_yes","gestures_no":
+			prefer_gestures = id=="gestures_yes"
+			briefing_page = 4
+			save_boundary()
+		"gesture_done":
 			story = ""
 			save_boundary()
 		"coords_toggle":
@@ -727,9 +798,18 @@ func activate(id: String) -> void:
 			return
 		"plan":
 			phase = "Resolve"
-			selected = stage==0
+			selected = stage in [0,1]
+			program.clear()
+			angle = 2
+			message = ""
 			if stage==0:
 				hint = false
+		"explore":
+			phase = "Navigate"
+			message = "The open bridge leads back to the fork relay."
+		"fight_route":
+			phase = "Navigate"
+			message = "Long route chosen. Fight or evade the mill creatures."
 		"hint": hint = true
 		"target": selected = true
 		"angle":
@@ -779,6 +859,11 @@ func activate(id: String) -> void:
 				begin_observe()
 				hint = true
 			else:
+				if stage in [1,2,3]:
+					if stage==1:
+						message = "Sluice open. The shortcut passes most mill creatures." if correct else "Sluice closed. Fight or evade the creatures on the long route."
+					else:
+						message = "Shortcut open; the open stones also reach the exit." if correct else "Shortcut sealed; take the open stones around it to the exit."
 				shield = 0 if correct or stage==0 else 3
 				if stage in [1,2,3] and correct:
 					board.open_shortcut(stage)
@@ -826,9 +911,13 @@ func cast(from: Vector3, direction: Vector3) -> Dictionary:
 func highlight(id: String) -> void:
 	if buttons.has(focus):
 		buttons[focus].modulate = buttons[focus].get_meta("ink")
+		buttons[focus].outline_size = 7
+		button_areas[focus].scale = Vector3.ONE
 	focus = id
 	if buttons.has(id):
-		buttons[id].modulate = Color("#853518") if buttons[id].get_meta("ink")==Board.INK else Board.BRASS
+		buttons[id].modulate = Color("#ffe08a")
+		buttons[id].outline_size = 11
+		button_areas[id].scale = Vector3.ONE*1.10
 
 func aim(from: Vector3, direction: Vector3, press: bool) -> void:
 	var hit := cast(from,direction)

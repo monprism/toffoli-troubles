@@ -128,17 +128,19 @@ Examples: **Noisy Lucky Coins** should introduce noise to the circuit to alterna
 
 | Room | What the player does |
 |---|---|
-| The Practice Yard | Use X to lower the first bridge, then route the fork relay to open a crossing to the stranded Pauli Puppy. |
-| Tidemark Mill | Recombine a split current into yin at the wooden waterwheel. Earn a Lucky Coin. |
+| The Practice Yard | Use X to lower the first bridge, then route the fork relay to either crossing to the stranded Pauli Puppy. After reaching Pauli, the player may return to the relay and solve the other crossing before leaving. |
+| Tidemark Mill | Choose the long route through the mill creatures or recombine the split sluice into yin to open a shortcut past most of them. A tonic waits farther along the creature route; earn a Lucky Coin after clearing the room. |
 | Ember Kilns | Shift the split flame’s phase and recombine it into yang. Earn a Phase Lens. |
 | The Glaze Orchard | Route a wisp into yang to clear Split Slime’s defenses. |
 | The Gilt Conservatory | Break the Crowned Split Slime’s two seals, strike the exposed crown, and choose a keepsake. |
 
 Between the yard and Tidemark Mill, a walkable meadow leads to the cave entrance. Mossy threshold stones, ruined arches and lava vents give the dungeons their terrain. Three smaller monsters patrol each dungeon on tactical turns. Cyan and pink light distinguish quantum channels.
 
-The title leads to a short briefing from Hadamard. He asks the player to free the vault’s light and recommends helping Pauli to learn how the gates work. The player chooses whether to display coordinates before entering the yard. Hadamard returns in an epilogue after the player chooses a keepsake.
+The title leads to a short briefing from Hadamard the Archemage. He asks the player to free the vault’s light and recommends helping Pauli to learn how the gates work. Before entering the yard, the player chooses whether to display coordinates and whether they would use hand gestures. The briefing shows the planned mapping—point to move, pinch to select, thumbs-up to advance, open palm to block and flick to strike—and says these controls are not ready to test yet. Hadamard returns in an epilogue after the player chooses a keepsake.
 
 A layered sandstone mesa and low perimeter walls frame each dungeon. Nearby monster species have distinct calls on dungeon turns. Each room uses a 12 × 12 movement grid with orthogonal moves, obstacles and a marked exit.
+
+The two Practice Yard crossings are independent. Choosing the direct shortcut does not make the upstream detour unsolvable: after rescuing Pauli, the player can return to the relay, measure again, and lower the other bridge. The crossing is optional, and the interface says so. Dungeon shortcuts follow the same principle: the open stone route still reaches the exit when a shortcut remains sealed, and the navigation message makes that clear.
 
 Each run starts with 5 HP. A tonic in Tidemark Mill and another in the Glaze Orchard each restore up to 2 HP when picked up below full health. Consuming a tonic or defeating a guardian saves the current crossing so healing and guard defeat persist through reload.
 

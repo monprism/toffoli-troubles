@@ -88,8 +88,11 @@
 - [x] Place Pauli beyond two impassable channels. Initialize the bridge winch to yin.
 - [x] Verify that 0 holds the first bridge up and X followed by measurement lowers it and unlocks its square.
 - [ ] In Resolve, select target then rune, preview odds and confirm or undo. Verify the phase dial can select π/4, π/2 and π.
+- [ ] At Tidemark Mill, verify the visible choice between solving the sluice for a shorter route and fighting/evading along the long route without resolving.
+- [ ] Verify the mill tonic is placed after the creature route and can be collected after that turn's damage when below 5 HP.
 - [ ] On entering Navigate, sample any pending readout once. Keep the resulting environment fixed during single-step movement, attacks, blocks and combat item use.
-- [x] Verify that both relay outcomes open playable routes to Pauli and each leaves the other deck raised.
+- [ ] Verify that both relay outcomes reach Pauli, then return to the relay and lower the other bridge before leaving; show that the second crossing is optional.
+- [ ] Verify that dungeon exits remain reachable with each shortcut sealed and the navigation message explains the open route.
 - [ ] Animate coherent path splitting, phase adjustment and recombination, with outcomes tied to simulation.
 - [ ] Add invalid-action explanations and Undo-before-resolve where sensible.
 - [ ] Save at a safe room boundary and verify that a cold restart restores that checkpoint.
