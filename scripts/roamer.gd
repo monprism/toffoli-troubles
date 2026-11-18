@@ -6,7 +6,7 @@ var kind: int
 var heading := 0
 var travel: Tween
 var body := Node3D.new()
-const NAMES := ["Mossback", "Cinder newt", "Veil moth"]
+const NAMES := ["Mossback", "Cinder newt", "Bell Moth"]
 
 func build(species: int, start: Vector2i) -> void:
 	kind = species

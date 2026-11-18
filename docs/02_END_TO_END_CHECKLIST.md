@@ -88,10 +88,13 @@
 - [x] Place Pauli beyond two impassable channels. Initialize the bridge winch to yin.
 - [x] Verify that 0 holds the first bridge up and X followed by measurement lowers it and unlocks its square.
 - [ ] In Resolve, select target then rune, preview odds and confirm or undo. Verify the phase dial can select π/4, π/2 and π.
-- [ ] At Tidemark Mill, verify the visible choice between solving the sluice for a shorter route and fighting/evading along the long route without resolving.
+- [x] Verify that Tidemark Mill visibly offers the sluice resolve choice alongside the fight/evade route. The smoke test checks both choices and exercises the resolved route.
 - [ ] Verify the mill tonic is placed after the creature route and can be collected after that turn's damage when below 5 HP.
 - [ ] On entering Navigate, sample any pending readout once. Keep the resulting environment fixed during single-step movement, attacks, blocks and combat item use.
-- [ ] Verify that both relay outcomes reach Pauli, then return to the relay and lower the other bridge before leaving; show that the second crossing is optional.
+- [x] Verify that standing next to either second-layer bridge exposes its local winch and the matching measurement opens only that crossing; the full-route smoke test also lowers both independently.
+- [ ] Verify Ember Kilns can be resolved from its entrance and grants a Phase Lens charge; the next lens strike deals 2 damage and consumes the charge.
+- [ ] Verify the Glaze Orchard begins with two wisps and a nearby resolve core; correct H–P(π)–H resolution visibly merges them and opens the shortcut.
+- [ ] Verify both Gilt Conservatory seals are visible at the entrance and must be resolved one at a time before the boss is exposed.
 - [ ] Verify that dungeon exits remain reachable with each shortcut sealed and the navigation message explains the open route.
 - [ ] Animate coherent path splitting, phase adjustment and recombination, with outcomes tied to simulation.
 - [ ] Add invalid-action explanations and Undo-before-resolve where sensible.

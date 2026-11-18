@@ -38,6 +38,8 @@ var scale_index := 1
 var tilt_index := 1
 var first_tracking := true
 var seal := 0
+var target_bridge := -1
+var target_seal := -1
 const MAX_HEALTH := 5
 const TONIC_HEAL := 2
 const TONIC_CELLS := {1: Vector2i(10,3),3: Vector2i(5,7)}
@@ -154,6 +156,9 @@ func _ready() -> void:
 		var cell: Vector2i = checkpoint.get_value("crossing","cell",Board.START)
 		if checkpoint.get_value("crossing","passage_open",false):
 			board.open_shortcut(stage)
+			if stage==4:
+				seal = 1
+				board.open_seal(0)
 		if board.walkable(cell):
 			hero_cell = cell
 			board.hero.position = Board.square(cell)
@@ -222,6 +227,8 @@ func build_stage() -> void:
 	shield = 0
 	guard_defeated = false
 	seal = 0
+	target_bridge = -1
+	target_seal = -1
 	begin_observe()
 	if in_field:
 		phase="Navigate"
@@ -234,6 +241,8 @@ func begin_observe() -> void:
 	program.clear()
 	angle = 2
 	selected = false
+	target_bridge = -1
+	target_seal = -1
 	message = ""
 	hint = false
 	idle_time = 0
@@ -322,7 +331,8 @@ func row(ids: Array, captions: Array, base_z: float = Board.FRONT) -> void:
 	var spacing := width*1.65 if spaced_choices else width
 	# Put the tray in front of the low mesa wall so it cannot hide pause or resolve actions.
 	var offset := 2.24 if (phase=="Resolve" and selected and not paused) or (phase=="Navigate" and not paused) else 0.0
-	var front_clearance := 2.10 if paused or (phase=="Observe" and stage>0) else 0.0
+	var at_yard_control := (seal==0 and hero_cell==Board.WINCHES[0]) or adjacent_bridge_index()>=0
+	var front_clearance := 2.10 if paused or (phase=="Observe" and stage>0) or (phase=="Observe" and stage==0 and at_yard_control) else 0.0
 	var tray_width := width+spacing*(ids.size()-1)+0.21
 	board.box(ui,Vector3(0,-0.32,base_z+0.69+offset+front_clearance),Vector3(tray_width,0.30,1.04),Board.WOOD)
 	board.box(ui,Vector3(0,-0.19,base_z+1.15+offset+front_clearance),Vector3(tray_width,0.10,0.085),Board.BRASS)
@@ -361,7 +371,7 @@ func yard_target(id: String, at: Vector3, size: Vector3) -> void:
 
 func yard_hint(reg: RuneRegister) -> String:
 	if phase=="Observe":
-		return "Walk to the glowing %s." % ("bridge winch" if seal==0 else "fork relay")
+		return "Walk to the first winch." if seal==0 else "Stand beside either raised bridge to operate its winch."
 	if is_equal_approx(reg.yang.length_squared(),1.0):
 		return "Measure 1 to lower the first bridge." if seal==0 else "Measure now to lower the diamond bridge beside Pauli."
 	if program.size()>=8:
@@ -387,6 +397,20 @@ func near_guard(cell: Vector2i) -> bool:
 	var offset := (guard_cell-cell).abs()
 	return offset.x+offset.y==1
 
+func adjacent_bridge_index() -> int:
+	if stage!=0 or seal==0:
+		return -1
+	for index in Board.FAR_SPANS.size():
+		var distance: Vector2i = (hero_cell-Board.FAR_SPANS[index]).abs()
+		if distance.x+distance.y==1 and board.blocked.has(Board.FAR_SPANS[index]):
+			return index
+	return -1
+
+func at_current_resolve_object() -> bool:
+	if stage==4:
+		return seal<Board.SEAL_CELLS.size() and hero_cell==Board.SEAL_CELLS[seal]
+	return stage in [2,3] and hero_cell==Board.RESOLVE_CELL
+
 func mark_moves() -> void:
 	for direction: Vector2i in [Vector2i.UP,Vector2i.DOWN,Vector2i.LEFT,Vector2i.RIGHT]:
 		var cell := hero_cell+direction
@@ -406,8 +430,13 @@ func mark_moves() -> void:
 		yard_target(id,center+Vector3.UP*0.12,Vector3(Board.CELL-0.04,0.27,Board.CELL-0.04))
 		var inlay := board.box(ui,center+Vector3.UP*0.04,Vector3(Board.CELL-0.15,0.04,Board.CELL-0.15),Color("#536e67"))
 		var marker := id if show_coordinates else ""
-		if stage==0 and not in_field and phase=="Observe" and cell==Board.WINCHES[seal]:
-			marker = "Winch" if seal==0 else "Relay"
+		if stage==0 and not in_field and phase=="Observe":
+			if seal==0 and cell==Board.WINCHES[0]:
+				marker = "Winch"
+			elif seal==1:
+				for bridge_index in Board.FAR_WINCHES.size():
+					if cell==Board.FAR_WINCHES[bridge_index] and board.blocked.has(Board.FAR_SPANS[bridge_index]):
+						marker = "Detour winch" if bridge_index==0 else "Shortcut winch"
 		var text := label(inlay,marker,Vector3.UP*0.045,36,Board.CREAM)
 		text.rotation.x = -PI/2
 		text.set_meta("ink",Board.CREAM)
@@ -418,8 +447,10 @@ func take_beat(id: String) -> void:
 	if moves.has(id):
 		hero_cell = moves[id]
 		board.move_hero(hero_cell)
-	elif id=="attack" and shield>0 and near_guard(hero_cell):
-		shield -= 1
+	elif id in ["attack","lens_strike"] and shield>0 and near_guard(hero_cell):
+		shield = maxi(0,shield-(2 if id=="lens_strike" else 1))
+		if id=="lens_strike":
+			lens_ready = false
 		if shield==0:
 			guard_defeated = true
 			checkpoint_needed = true
@@ -477,7 +508,11 @@ func refresh() -> void:
 	label(ui,"%s   ·   %d/%d HP" % [phase,health,MAX_HEALTH],Vector3(0,3.21,Board.REAR-1.60),20,Board.CREAM)
 	var preview := state()
 	board.process_mode = Node.PROCESS_MODE_DISABLED if paused else Node.PROCESS_MODE_INHERIT
-	var emitter := Board.square(Board.WINCHES[seal])+Vector3(-0.40,1.0,-0.47) if stage==0 else board.rune_station+Vector3.UP*0.57
+	var emitter := board.rune_station+Vector3.UP*0.57
+	if stage==0:
+		emitter = Board.square(Board.WINCHES[0])+Vector3(-0.40,1.0,-0.47) if seal==0 else (Board.square(Board.FAR_WINCHES[target_bridge])+Vector3(-0.40,1.0,-0.47) if target_bridge>=0 else Vector3.ZERO)
+	elif stage==4 and target_seal>=0:
+		emitter = Board.square(Board.SEAL_CELLS[target_seal])+Vector3.UP*0.72
 	board.show_register(phase=="Resolve" and selected and not paused,emitter,preview.yin,preview.yang)
 	if stage==0 and phase=="Resolve" and not paused:
 		if seal==0:
@@ -515,19 +550,25 @@ func refresh() -> void:
 			"Observe":
 				line = HINTS[stage] if hint else INTENTS[stage]
 				if stage==0:
-					var winch: Vector2i = Board.WINCHES[seal]
-					var nameplate := "Bridge winch" if seal==0 else "Fork relay"
-					var at := Board.square(winch)
 					mark_moves()
-					if hero_cell==winch:
-						station_sign("plan",nameplate,at+Vector3(-0.55,1.1,-0.77))
-						yard_target("plan",at+Vector3(-0.40,0.50,-0.47),Vector3(0.85,1.0,0.85))
-						line = "Select Bridge winch. Its 1 output lowers the deck." if seal==0 else "Select Fork relay. Its two outputs feed different bridges."
+					if seal==0:
+						var winch: Vector2i = Board.WINCHES[0]
+						var at := Board.square(winch)
+						if hero_cell==winch:
+							station_sign("plan","Bridge winch",at+Vector3(-0.55,1.1,-0.77))
+							yard_target("plan",at+Vector3(-0.40,0.50,-0.47),Vector3(0.85,1.0,0.85))
+							line = "Select Bridge winch. Its 1 output lowers the deck."
+						else:
+							label(ui,"Bridge winch"+ (" (%s)" % square_name(winch) if show_coordinates else ""),at+Vector3.UP*1.18,28,Board.BRASS)
+							line = "Pauli is stranded. Walk to the bridge winch."
 					else:
-						label(ui,nameplate+(" (%s)" % square_name(winch) if show_coordinates else ""),at+Vector3.UP*1.18,28,Board.BRASS)
-						line = "Pauli is stranded. Walk to the bridge winch." if seal==0 else "Cross the lowered bridge and walk to the fork relay."
-						if hint:
-							line = "Select the green squares to reach the glowing mechanism."
+						var bridge_index := adjacent_bridge_index()
+						if bridge_index>=0:
+							var bridge_name := "detour" if bridge_index==0 else "shortcut"
+							row(["plan"],["Resolve %s" % bridge_name])
+							line = message if message!="" else "At the %s winch. Resolve here to lower this bridge." % bridge_name
+						else:
+								line = "Cross the first bridge, then stand beside either raised bridge to operate its winch."
 					field_notes()
 				elif stage==1:
 					line = "Choose: solve the sluice for a shorter route, or fight and evade the creatures."
@@ -535,7 +576,13 @@ func refresh() -> void:
 						line = HINTS[stage]
 					row(["fight_route","plan","hint"],["Fight through","Resolve sluice","Hint"])
 				else:
-					station_sign("plan","Resolve",Vector3(3.35,1.10,-0.36))
+					mark_moves()
+					if at_current_resolve_object():
+						var action_name := "Resolve kiln phase" if stage==2 else ("Resolve wisp pair" if stage==3 else ("Resolve first seal" if seal==0 else "Resolve second seal"))
+						row(["plan","hint"],[action_name,"Hint"])
+						line = "Resolve the kiln phase to forge the Phase Lens." if stage==2 else ("Resolve the paired wisps into one." if stage==3 else "The two conservatory seals are here at the entrance.")
+					else:
+						line = "Approach the kiln phase core." if stage==2 else ("Approach the paired wisps at the entry." if stage==3 else ("Approach the first seal." if seal==0 else "Approach the second seal."))
 					field_notes()
 			"Resolve":
 				if not selected:
@@ -546,8 +593,6 @@ func refresh() -> void:
 				else:
 					if coins > 0:
 						action("coin_read","Lucky coin",Vector3(-3.85,1.82,0.1),2.1,Board.INK)
-					if lens_ready:
-						action("lens_shift","Lens +180°",Vector3(-1.6,1.82,0.1),2.15,Board.INK)
 					circuit_strip(preview)
 					var odds := roundi(preview.yang.length_squared()*100)
 					line = "Aim for the round exit, then measure." if stage==1 else "Aim for the diamond outcome, then measure."
@@ -562,13 +607,19 @@ func refresh() -> void:
 					if stage==0:
 						field_notes()
 						var cue := "Winch: 0 holds the bridge up. 1 lowers it. Try X." if seal==0 else "Round lowers the upstream detour. Diamond lowers the bridge to Pauli."
+						if seal==1 and target_bridge>=0:
+							cue = "This detour winch opens on round. Measure 0." if target_bridge==0 else "This shortcut winch opens on diamond. Prepare |1⟩, then measure."
 						if not program.is_empty():
 							match program.back():
 								"X": cue = "Measure the winch to set the bridge."
 								"H": cue = "H mixes the paths. Their relative phase sets the output odds."
 								_: cue = "P rotates the |1⟩ amplitude. Apply H to turn phase into exit odds."
-						if odds==100:
-							cue = "Measure to lower the first bridge." if seal==0 else "Measure to lower the diamond bridge."
+						if seal==0 and odds==100:
+							cue = "Measure to lower the first bridge."
+						elif seal==1 and target_bridge>=0:
+							var target_odds := roundi(100*(preview.yin.length_squared() if target_bridge==0 else preview.yang.length_squared()))
+							if target_odds==100:
+								cue = "Measure to lower the %s bridge." % ("detour" if target_bridge==0 else "shortcut")
 						if hint:
 							cue = yard_hint(preview)
 						line = cue
@@ -583,16 +634,20 @@ func refresh() -> void:
 					line = message
 				if message.begins_with("Tonic") or guard_defeated:
 					line = "%s Reach the brass-framed exit." % (message if message!="" else "Guardian defeated.")
+				if stage==2 and message.begins_with("Phase Lens"):
+					line = message
 				if stage==0:
 					line = "%s Walk across to Pauli." % message
-					if seal==1 and hero_cell==Board.WINCHES[1] and (board.blocked.has(Board.FAR_SPANS[0]) or board.blocked.has(Board.FAR_SPANS[1])):
-						station_sign("plan","Use fork relay",Board.square(Board.WINCHES[1])+Vector3(-0.55,1.1,-0.77))
-						line = "Optional crossing: select the relay to lower the other bridge."
 				if shield>0:
 					line = "The guardian is active. Approach to strike."
 					if near_guard(hero_cell):
 						line = "Guard will strike." if beat%2==0 else "Guard is between strikes. Strike or move."
-						row(["attack","block"],["Strike","Block"])
+						var combat_ids := ["attack","block"]
+						var combat_names := ["Strike","Block"]
+						if lens_ready:
+							combat_ids.append("lens_strike")
+							combat_names.append("Lens strike +1")
+						row(combat_ids,combat_names)
 				var attacker := board.adjacent_monster(hero_cell)
 				if attacker and not (shield>0 and near_guard(hero_cell)):
 					line = "%s nearby. Strike, block or move." % attacker.NAMES[attacker.kind]
@@ -601,15 +656,12 @@ func refresh() -> void:
 			"Achieve":
 				line = "The vault seals are open." if stage==4 else "Room cleared. The next trail marker is lit."
 				if stage==0:
-					line = "Pauli is safe. The other crossing is optional; return to the relay to lower it before leaving."
+					line = "Pauli is safe. The meadow trail leads to the dungeon."
 				elif stage==1:
 					line = "Mill treasure: a Lucky Coin. Spend it for a noisy read."
 				elif stage==2:
-					line = "Kiln treasure: a Phase Lens. Add one half-turn to a core."
-				if stage==0 and (board.blocked.has(Board.FAR_SPANS[0]) or board.blocked.has(Board.FAR_SPANS[1])):
-					row(["explore","next"],["Try other bridge","To the meadow"])
-				else:
-					row(["next"],["Open treasury" if stage==4 else ("To the meadow" if stage==0 else "Next room")])
+					line = "The Phase Lens is ready to strengthen one strike."
+				row(["next"],["Open treasury" if stage==4 else ("To the meadow" if stage==0 else "Next room")])
 			"Treasure":
 				line = "Choose a keepsake from the vault."
 				row(["coin","lens","dice"],RELICS)
@@ -798,15 +850,14 @@ func activate(id: String) -> void:
 			return
 		"plan":
 			phase = "Resolve"
-			selected = stage in [0,1]
+			selected = true
+			target_bridge = adjacent_bridge_index() if stage==0 and seal==1 else -1
+			target_seal = seal if stage==4 else -1
 			program.clear()
 			angle = 2
 			message = ""
 			if stage==0:
 				hint = false
-		"explore":
-			phase = "Navigate"
-			message = "The open bridge leads back to the fork relay."
 		"fight_route":
 			phase = "Navigate"
 			message = "Long route chosen. Fight or evade the mill creatures."
@@ -820,16 +871,14 @@ func activate(id: String) -> void:
 				message = "Eight gates prepared. Undo a gate or measure."
 			else:
 				program.append("P"+str(angle) if id=="P" else id)
-				var input_point := Board.square(Board.WINCHES[seal]) if stage==0 else board.rune_station
+				var input_point := board.rune_station
+				if stage==0:
+					input_point = Board.square(Board.WINCHES[0]) if seal==0 else Board.square(Board.FAR_WINCHES[target_bridge])
 				var color := Board.VIOLET if id=="P" else Board.CYAN
 				board.discharge(input_point-Vector3.RIGHT*1.1,input_point,color)
 		"undo":
 			if not program.is_empty():
 				program.pop_back()
-		"lens_shift":
-			if program.size()<8:
-				program.append("P2")
-				lens_ready = false
 		"read","coin_read":
 			var prepared := state()
 			if id=="coin_read":
@@ -838,12 +887,15 @@ func activate(id: String) -> void:
 					prepared.apply("X")
 			var outcome := prepared.measure(rng)
 			var correct := outcome == (0 if stage==1 else 1)
+			if stage==0 and seal==1:
+				correct = outcome==target_bridge
 			message = "Measured "+("yang" if outcome==1 else "yin")
 			if stage in [0,4] and seal==0 and correct:
 				if stage==0:
 					board.lower_bridge(Board.FIRST_SPAN)
 				else:
 					board.open_shortcut(stage)
+					board.open_seal(target_seal)
 				seal = 1
 				begin_observe()
 				hint = stage!=0
@@ -859,22 +911,34 @@ func activate(id: String) -> void:
 				begin_observe()
 				hint = true
 			else:
-				if stage in [1,2,3]:
-					if stage==1:
-						message = "Sluice open. The shortcut passes most mill creatures." if correct else "Sluice closed. Fight or evade the creatures on the long route."
-					else:
-						message = "Shortcut open; the open stones also reach the exit." if correct else "Shortcut sealed; take the open stones around it to the exit."
-				shield = 0 if correct or stage==0 else 3
-				if stage in [1,2,3] and correct:
-					board.open_shortcut(stage)
-				if stage==4:
-					shield = 1
-					message = "Crown exposed. Strike once."
 				if stage==0:
-					board.lower_bridge(Board.FAR_SPANS[outcome])
-					message = "Upstream bridge down." if outcome==0 else "Diamond bridge down."
-				phase = "Navigate"
-		"attack","block":
+					var route := "Detour" if target_bridge==0 else "Shortcut"
+					if correct:
+						board.lower_bridge(Board.FAR_SPANS[target_bridge])
+						begin_observe()
+						message = "%s bridge lowered. Stand beside the other bridge to operate its winch, or walk to Pauli." % route
+					else:
+						begin_observe()
+						hint = true
+						message = "The %s winch needs a %s result. Adjust the circuit and try again." % [route.to_lower(),"round" if target_bridge==0 else "diamond"]
+				else:
+					if stage in [1,2,3]:
+						if stage==1:
+							message = "Sluice open. The shortcut passes most mill creatures." if correct else "Sluice closed. Fight or evade the creatures on the long route."
+						elif stage==2 and correct:
+							lens_ready = true
+							message = "Phase Lens earned. Your next strike deals an extra hit."
+						else:
+							message = "Shortcut open; the open stones also reach the exit." if correct else "Shortcut sealed; take the open stones around it to the exit."
+					shield = 0 if correct else 3
+					if stage in [1,2,3] and correct:
+						board.open_shortcut(stage)
+					if stage==4:
+						board.open_seal(target_seal)
+						shield = 1
+						message = "Crown exposed. Strike once."
+					phase = "Navigate"
+		"attack","block","lens_strike":
 			take_beat(id)
 		"next":
 			if stage==0 and not in_field:
@@ -887,8 +951,6 @@ func activate(id: String) -> void:
 			else:
 				if stage==1:
 					coins = 1
-				if stage==2:
-					lens_ready = true
 				in_field=false
 				stage += 1
 				save_boundary()
@@ -912,12 +974,14 @@ func highlight(id: String) -> void:
 	if buttons.has(focus):
 		buttons[focus].modulate = buttons[focus].get_meta("ink")
 		buttons[focus].outline_size = 7
-		button_areas[focus].scale = Vector3.ONE
+		if button_areas.has(focus):
+			button_areas[focus].scale = Vector3.ONE
 	focus = id
 	if buttons.has(id):
 		buttons[id].modulate = Color("#ffe08a")
 		buttons[id].outline_size = 11
-		button_areas[id].scale = Vector3.ONE*1.10
+		if button_areas.has(id):
+			button_areas[id].scale = Vector3.ONE*1.10
 
 func aim(from: Vector3, direction: Vector3, press: bool) -> void:
 	var hit := cast(from,direction)

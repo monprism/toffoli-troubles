@@ -9,6 +9,8 @@ const WINCHES := [Vector2i(2,9),Vector2i(6,6)]
 const FIRST_SPAN := Vector2i(3,9)
 const FAR_SPANS := [Vector2i(7,2),Vector2i(7,6)]
 const PAULI := Vector2i(10,6)
+const RESOLVE_CELL := Vector2i(2,9)
+const SEAL_CELLS := [Vector2i(2,9),Vector2i(2,8)]
 const GRID_WIDTH := BOARD_SIZE.x*CELL
 const GRID_DEPTH := BOARD_SIZE.y*CELL
 const REAR := -GRID_DEPTH*0.5
@@ -25,6 +27,7 @@ const BARRIERS := [
 var blocked: Array
 var exit_cell: Vector2i
 var move_tween: Tween
+var room_stage := 0
 
 static func square(cell: Vector2i) -> Vector3:
 	return Vector3((cell.x+0.5)*CELL-GRID_WIDTH/2,0,(cell.y+0.5)*CELL-GRID_DEPTH/2)
@@ -47,7 +50,8 @@ func move_hero(cell: Vector2i) -> void:
 	move_tween = create_tween()
 	move_tween.tween_property(hero,"position",square(cell),0.19).set_trans(Tween.TRANS_SINE)
 
-const SHORTCUTS := [Vector2i.ZERO,Vector2i(7,5),Vector2i(5,4),Vector2i(6,7),Vector2i(5,5)]
+const SHORTCUTS := [Vector2i.ZERO,Vector2i(4,8),Vector2i(5,4),Vector2i(6,7),Vector2i(5,5)]
+const FAR_WINCHES := [Vector2i(6,2),Vector2i(6,6)]
 var shortcut: Node3D
 var bridges := {}
 var puppy_tail: Node3D
@@ -66,6 +70,10 @@ var treasure: Node3D
 const QuantumFork := preload("res://scripts/quantum_fork.gd")
 var quantum_fork: QuantumFork
 var rune_station := Vector3.ZERO
+var wisps: Array[Node3D] = []
+var merged_wisp: Node3D
+var wisps_merged := false
+var seal_nodes: Array[Node3D] = []
 func coordinate(caption: String, at: Vector3) -> void:
 	var engraving := Label3D.new()
 	engraving.text = caption
@@ -84,6 +92,7 @@ func set_coordinates_visible(enabled: bool) -> void:
 		engraving.visible = enabled
 
 func build(stage: int) -> void:
+	room_stage = stage
 	for rect: Rect2i in BARRIERS[stage]:
 		for x in range(rect.position.x,rect.end.x):
 			for y in range(rect.position.y,rect.end.y):
@@ -174,11 +183,16 @@ func build(stage: int) -> void:
 				var t := i*PI/6
 				box(self,Vector3(-1+2.3*cos(t),0.32+2.3*sin(t),REAR-0.925),Vector3(1.12,0.54,0.8),[BRASS,CREAM][i%2]).rotation.z=t+PI/2
 	if stage!=0:
-		rune_station = square(SHORTCUTS[stage])+Vector3(-2.6,0,0.65)
+		rune_station = square(RESOLVE_CELL)
+	if stage in [1,2,3]:
 		var socket := group(rune_station)
 		drum(socket,Vector3.UP*0.15,0.46,0.39,0.30,INK,8)
 		drum(socket,Vector3.UP*0.32,0.38,0.31,0.11,BRASS,8)
 		drum(socket,Vector3.UP*0.52,0.125,0,0.27,CYAN,5)
+	if stage==3:
+		build_wisp_pair()
+	if stage==4:
+		build_seals()
 	quantum_fork = QuantumFork.new()
 	add_child(quantum_fork)
 	build_hero()
@@ -277,7 +291,8 @@ func build_crossings() -> void:
 			box(hinge,Vector3(CELL/2,0.15,side*CELL*0.38),Vector3(CELL,0.10,0.075),BRASS)
 		box(hinge,Vector3(CELL/2,0.18,0),Vector3(CELL,0.05,0.07),CYAN if cell!=FAR_SPANS[1] else VIOLET)
 		hinge.rotation.z = deg_to_rad(78)
-	for cell: Vector2i in WINCHES:
+	var station_cells: Array[Vector2i] = [WINCHES[0],FAR_WINCHES[0],FAR_WINCHES[1]]
+	for cell: Vector2i in station_cells:
 		var winch := group(square(cell)+Vector3(-0.40,0,-0.47))
 		aura(winch,Vector3.UP*0.08,2.15,CYAN)
 		drum(winch,Vector3.UP*0.85,0.12,0,0.37,CYAN,5)
@@ -286,10 +301,7 @@ func build_crossings() -> void:
 		spindle.rotation.z = PI/2
 		box(winch,Vector3(0.34,0.70,0),Vector3(0.08,0.35,0.08),INK)
 		box(winch,Vector3(0.43,0.86,0),Vector3(0.26,0.08,0.10),BRASS)
-	# The fork at the relay physically connects it to the two possible decks.
-	var relay := square(WINCHES[1])
-	var far := square(FAR_SPANS[0])
-	box(self,Vector3(relay.x+0.63,0.06,(relay.z+far.z)/2),Vector3(0.065,0.045,relay.z-far.z),BRASS)
+	# Each far bridge has its own winch on the approach side.
 	for cell: Vector2i in FAR_SPANS:
 		var bank := square(cell)-Vector3.RIGHT*(CELL/2)
 		var badge := drum(self,bank+Vector3(-0.28,0.20,-0.66),0.24,0.24,0.12,LEAF if cell==FAR_SPANS[0] else CLAY,12 if cell==FAR_SPANS[0] else 4)
@@ -299,6 +311,53 @@ func open_shortcut(stage: int) -> void:
 	discharge(rune_station,square(SHORTCUTS[stage]),CYAN)
 	blocked.erase(SHORTCUTS[stage])
 	create_tween().set_trans(Tween.TRANS_SINE).tween_property(shortcut,"position:y",-2.35,0.55)
+	if stage==3:
+		merge_wisps()
+
+func build_wisp_pair() -> void:
+	for index in 2:
+		var tint := CYAN if index==0 else VIOLET
+		var offset := -0.50 if index==0 else 0.50
+		var wisp := group(rune_station+Vector3(offset,0.55,0.32))
+		orb(wisp,Vector3.UP*0.22,Vector3(0.34,0.46,0.34),tint)
+		aura(wisp,Vector3.UP*0.16,0.78,tint)
+		wisps.append(wisp)
+	merged_wisp = group(rune_station+Vector3(0,0.78,0.32))
+	orb(merged_wisp,Vector3.UP*0.08,Vector3(0.54,0.72,0.54),CREAM)
+	orb(merged_wisp,Vector3.UP*0.08,Vector3(0.33,0.48,0.33),CYAN)
+	aura(merged_wisp,Vector3.ZERO,1.18,CYAN)
+	merged_wisp.hide()
+
+func merge_wisps() -> void:
+	if wisps_merged:
+		return
+	wisps_merged = true
+	merged_wisp.show()
+	merged_wisp.scale = Vector3.ONE*0.02
+	create_tween().set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT).tween_property(merged_wisp,"scale",Vector3.ONE,0.42)
+	for wisp in wisps:
+		var fold := wisp.create_tween().set_parallel(true).set_trans(Tween.TRANS_SINE)
+		fold.tween_property(wisp,"position",merged_wisp.position,0.38)
+		fold.tween_property(wisp,"scale",Vector3.ONE*0.02,0.38)
+		fold.chain().tween_callback(Callable(wisp,"hide"))
+
+func build_seals() -> void:
+	for index in SEAL_CELLS.size():
+		var seal := group(square(SEAL_CELLS[index]))
+		var tint := CYAN if index==0 else VIOLET
+		drum(seal,Vector3.UP*0.12,0.62,0.54,0.20,INK,8)
+		var crest := drum(seal,Vector3.UP*0.32,0.47,0.35,0.12,tint,6)
+		crest.rotation.x = PI/2
+		aura(seal,Vector3.UP*0.04,1.75,tint)
+		seal_nodes.append(seal)
+
+func open_seal(index: int) -> void:
+	if index<0 or index>=seal_nodes.size():
+		return
+	var seal := seal_nodes[index]
+	var vanish := seal.create_tween().set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_IN)
+	vanish.tween_property(seal,"scale",Vector3.ONE*0.02,0.35)
+	vanish.tween_callback(Callable(seal,"hide"))
 
 func lower_bridge(cell: Vector2i) -> void:
 	discharge(square(WINCHES[0] if cell==FIRST_SPAN else WINCHES[1]),square(cell),VIOLET if cell==FAR_SPANS[1] else CYAN)
@@ -389,6 +448,8 @@ func spawn_roamers(stage: int) -> void:
 	var homes := [Vector2i(2,2),Vector2i(5,8),Vector2i(9,3)]
 	if training_wildlife:
 		homes=[Vector2i(FIRST_SPAN.x,2),Vector2i(FAR_SPANS[0].x,9)]
+	elif stage==1:
+		homes=[Vector2i(2,2),Vector2i(5,4),Vector2i(9,3)]
 	for i in homes.size():
 		var start: Vector2i = homes[i]
 		if not training_wildlife:
@@ -431,6 +492,8 @@ func advance_roamers(player: Vector2i, guard: Vector2i, blocking: bool) -> int:
 			var direction: Vector2i = DIRECTIONS[(i+mob.heading)%4]
 			var candidate := mob.cell+direction
 			if candidate==player or candidate==guard or candidate==exit_cell or monster_at(candidate):
+				continue
+			if room_stage==1 and not blocked.has(SHORTCUTS[1]) and candidate==SHORTCUTS[1]:
 				continue
 			if training_wildlife:
 				if candidate.x!=mob.home.x or absi(candidate.y-mob.home.y)>1:

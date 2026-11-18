@@ -25,8 +25,12 @@ func solve(sequence: Array) -> void:
 func cross_board() -> void:
 	if game.stage==4:
 		walk_to(game.guard_cell+Vector2i.DOWN)
-		command("block")
-		command("attack")
+		if game.lens_ready:
+			command("lens_strike")
+			check(not game.lens_ready and game.shield==0,"The Phase Lens adds one damage and consumes its charge")
+		else:
+			command("block")
+			command("attack")
 		check(game.guard_defeated and not game.board.creature.visible,"A killed guard disappears")
 		var guard_save = load("res://world.tscn").instantiate()
 		root.add_child(guard_save)
@@ -81,6 +85,11 @@ func run() -> void:
 	command("story_next")
 	command("story_next")
 	command("coords_off")
+	check(game.story=="Briefing" and game.briefing_page==3,"Coordinate choice leads to the gesture preference")
+	command("gestures_yes")
+	check(game.prefer_gestures and game.briefing_page==4,"Gesture preference is recorded before showing the guide")
+	check(game.buttons.has("gesture_done"),"Gesture guide offers entry into the Practice Yard")
+	command("gesture_done")
 	check(game.story=="" and game.phase=="Observe" and game.board.visible,"Briefing leads into the Practice Yard")
 	check(not game.show_coordinates and not game.board.coordinate_labels[0].visible,"Coordinates default to hidden")
 	game.stage = 0
@@ -131,16 +140,34 @@ func run() -> void:
 	command("H")
 	command("read")
 	check(game.board.walkable(game.board.FAR_SPANS[1]) and not game.board.walkable(game.board.FAR_SPANS[0]),"Interference opens only the diamond crossing")
+	check(game.phase=="Observe","The yard remains in Observe after lowering a bridge")
+	walk_to(game.board.FAR_WINCHES[0])
+	check(game.buttons.has("plan"),"Standing beside the detour bridge exposes its local winch")
+	command("plan")
+	command("read")
+	check(game.board.walkable(game.board.FAR_SPANS[0]) and game.board.walkable(game.board.FAR_SPANS[1]),"The detour and shortcut open independently at their own winches")
 	for stage in range(5):
 		check(game.stage==stage,"Room order")
+		if stage==1:
+			check(game.buttons.has("fight_route") and game.buttons.has("plan"),"Mill offers a fight route and a visible sluice resolve choice")
 		match stage:
 			1: solve(["H"])
-			2: solve(["P","H"])
-			3: solve(["H","P","H"])
-			4:
-				solve(["X"])
+			2:
+				walk_to(game.board.RESOLVE_CELL)
 				solve(["P","H"])
-		check(game.phase=="Navigate","Route opens")
+				check(game.lens_ready,"Correct kiln resolution awards the Phase Lens charge")
+			3:
+				check(game.board.wisps.size()==2 and not game.board.wisps_merged,"Orchard starts with two separate wisps")
+				walk_to(game.board.RESOLVE_CELL)
+				solve(["H","P","H"])
+				check(game.board.wisps_merged,"Correct orchard resolution merges the wisps")
+			4:
+				check(game.board.seal_nodes.size()==2,"Both conservatory seals are built at the room entrance")
+				walk_to(game.board.SEAL_CELLS[0])
+				solve(["X"])
+				walk_to(game.board.SEAL_CELLS[1])
+				solve(["P","H"])
+		check(game.phase==("Observe" if stage==0 else "Navigate"),"Yard stays in Observe; dungeon route opens in Navigate")
 		if stage!=0:
 			check(game.board.roamers.size()==3,"Dungeon has three additional roaming monsters")
 			check(game.board.walkable(game.board.SHORTCUTS[stage]),"Measurement clears the dungeon passage")
@@ -187,18 +214,22 @@ func run() -> void:
 	command("story_next")
 	command("story_next")
 	command("coords_on")
+	command("gestures_no")
+	check(not game.prefer_gestures and game.briefing_page==4,"The player can defer gestures and still see the mapping")
+	command("gesture_done")
 	check(game.show_coordinates and game.board.coordinate_labels[0].visible,"The briefing can enable board coordinates")
 	check(game.health==5,"Restart restores 5 HP")
 	walk_to(game.board.WINCHES[0])
 	solve(["X"])
-	walk_to(game.board.WINCHES[1])
+	walk_to(game.board.FAR_WINCHES[0])
 	solve([])
-	check(game.board.walkable(game.board.FAR_SPANS[0]) and not game.board.walkable(game.board.FAR_SPANS[1]),"Round result opens only the detour")
+	check(game.board.walkable(game.board.FAR_SPANS[0]) and not game.board.walkable(game.board.FAR_SPANS[1]),"Round result opens the detour at its local winch")
 	walk_to(game.board.PAULI)
-	check(game.phase=="Achieve","The detour also reaches Pauli")
+	check(game.phase=="Achieve" and not game.buttons.has("explore"),"The detour reaches Pauli without a post-rescue prompt")
 	game.stage = 4
 	game.build_stage()
 	game.health = 1
+	walk_to(game.board.SEAL_CELLS[0])
 	solve([])
 	check(game.phase=="Lost","Defeat condition")
 	print("World smoke test: %d failures" % failures)

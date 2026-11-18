@@ -107,7 +107,7 @@ The player can measure a register early to get a usable answer now, or preserve 
 
 ### G. Items: classical or quantum transformations (Isaac-like synergies)
 Quantum actions shouldn't always be the only way to clear a dungeon.
-Examples: **Noisy Lucky Coins** should introduce noise to the circuit to alternate results. If only |0> single gate measurement opens it and you are given |1>, each coin gives you one turn to measure to resolve the puzzle by chance if you didn't resolve it already (if resolved disable it). If chances run out, you gotta solve the puzzle. **Hadamard's Hints** will give further text hints. **Phase Lens** allow you to shift phase, often resolving problems. **Deutsch's Dice** can give you a random gate you can try using to resolve, **Coherence Charm** allows one extra preparation turn before an enemy forces measurement. Upgrades **modify rules/resources**, not mathematically falsify gate effects. Classical items are typical combat items (HP recovery, buff/nerf, stuns an enemy, etc.)
+Examples: **Noisy Lucky Coins** should introduce noise to the circuit to alternate results. If only |0> single gate measurement opens it and you are given |1>, each coin gives you one turn to measure to resolve the puzzle by chance if you didn't resolve it already (if resolved disable it). If chances run out, you gotta solve the puzzle. **Hadamard's Hints** will give further text hints. In the current route, the **Phase Lens** is a weapon charge earned by resolving Ember Kilns: its next strike deals one extra damage, then consumes the charge. **Deutsch's Dice** can give you a random gate you can try using to resolve, **Coherence Charm** allows one extra preparation turn before an enemy forces measurement. Upgrades **modify rules/resources**, not mathematically falsify gate effects. Classical items are typical combat items (HP recovery, buff/nerf, stuns an enemy, etc.)
 
 ## 9. Combat and dungeon systems
 
@@ -128,11 +128,11 @@ Examples: **Noisy Lucky Coins** should introduce noise to the circuit to alterna
 
 | Room | What the player does |
 |---|---|
-| The Practice Yard | Use X to lower the first bridge, then route the fork relay to either crossing to the stranded Pauli Puppy. After reaching Pauli, the player may return to the relay and solve the other crossing before leaving. |
-| Tidemark Mill | Choose the long route through the mill creatures or recombine the split sluice into yin to open a shortcut past most of them. A tonic waits farther along the creature route; earn a Lucky Coin after clearing the room. |
-| Ember Kilns | Shift the split flame’s phase and recombine it into yang. Earn a Phase Lens. |
-| The Glaze Orchard | Route a wisp into yang to clear Split Slime’s defenses. |
-| The Gilt Conservatory | Break the Crowned Split Slime’s two seals, strike the exposed crown, and choose a keepsake. |
+| The Practice Yard | Use X to lower the first bridge, then stand beside either second-layer bridge and resolve its local winch: round lowers the detour, diamond lowers the shortcut. Both crossings are independently interactable before heading to Pauli. |
+| Tidemark Mill | At the entrance, choose the long route through the mill creatures or recombine the nearby sluice into yin to open a clear, narrow passage before the creature gauntlet. A tonic waits farther along the creature route; earn a Lucky Coin after clearing the room. |
+| Ember Kilns | At the entrance, resolve the split-flame circuit with P(π), then H. The kiln forges a Phase Lens weapon charge: the next strike deals one extra damage and consumes it. |
+| The Glaze Orchard | Two wisps and their resolve core wait at the entrance. Approach and resolve H, P(π), H to merge the pair into one and clear the shortcut; the creature route remains playable if the puzzle is skipped. |
+| The Gilt Conservatory | Two separate seals stand at the entrance. Approach and resolve each in turn (X for the first; P(π), then H for the second) to expose the Crowned Split Slime, then strike it and choose a keepsake. |
 
 Between the yard and Tidemark Mill, a walkable meadow leads to the cave entrance. Mossy threshold stones, ruined arches and lava vents give the dungeons their terrain. Three smaller monsters patrol each dungeon on tactical turns. Cyan and pink light distinguish quantum channels.
 
@@ -140,11 +140,11 @@ The title leads to a short briefing from Hadamard the Archemage. He asks the pla
 
 A layered sandstone mesa and low perimeter walls frame each dungeon. Nearby monster species have distinct calls on dungeon turns. Each room uses a 12 × 12 movement grid with orthogonal moves, obstacles and a marked exit.
 
-The two Practice Yard crossings are independent. Choosing the direct shortcut does not make the upstream detour unsolvable: after rescuing Pauli, the player can return to the relay, measure again, and lower the other bridge. The crossing is optional, and the interface says so. Dungeon shortcuts follow the same principle: the open stone route still reaches the exit when a shortcut remains sealed, and the navigation message makes that clear.
+The two Practice Yard crossings are independent. Each has its own nearby winch, and the interaction appears when the player stands next to that bridge. The player can lower either crossing without visiting a central relay or being forced onto one route. Dungeon shortcuts follow the same principle: the open stone route still reaches the exit when a shortcut remains sealed, and the navigation message makes that clear.
 
 Each run starts with 5 HP. A tonic in Tidemark Mill and another in the Glaze Orchard each restore up to 2 HP when picked up below full health. Consuming a tonic or defeating a guardian saves the current crossing so healing and guard defeat persist through reload.
 
-The Lucky Coin and Phase Lens earned along the route are consumables. The final vault offers the Noisy Lucky Coin, Phase Lens and Deutsch’s Dice as collectible keepsakes. This fixed route is playable on desktop. The session length and hands-only requirements below remain headset playtest targets. [Desktop launch and controls](../README.md#play-on-desktop)
+The Lucky Coin is a one-use noisy measurement aid. The Phase Lens earned in Ember Kilns is a one-use weapon charge that adds one damage to the next strike. The final vault offers the Noisy Lucky Coin, Phase Lens and Deutsch’s Dice as collectible keepsakes. This fixed route is playable on desktop. The session length and hands-only requirements below remain headset playtest targets. [Desktop launch and controls](../README.md#play-on-desktop)
 
 ## 10. Control via gesture
 One hand mode: left or right hand
@@ -166,7 +166,7 @@ For movements if buttons are easy do that.
 
 - Working standalone Quest 3S build in Godot, hands-only from boot to exit.
 - Recenterable **virtual floating board**, with passthrough as an optional mode.
-- One complete miniature room, one hero, one stranded Pauli Puppy, a bridge winch and a two-output relay.
+- One complete miniature room, one hero, one stranded Pauli Puppy and three local bridge winches.
 - Hand-ray **point -> pinch -> confirm** flow, giant pause/recenter controls, one-hand alternative.
 - **H, X, P(theta)** on a single qubit, plus explicit measurement and visually distinct probabilistic results.
 - Correct quantum math and unit tests; tutorial + win/lose/restart loop.
